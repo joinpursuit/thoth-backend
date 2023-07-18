@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
-    "start": "nodemon --ignore runs/ server.js"
+    "start": "nodemon --ignore runs/ server.js",
+    "prebuild": "node generateCreds.js"
   },
   "keywords": [],
   "author": "",
