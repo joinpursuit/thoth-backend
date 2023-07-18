@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int               @id @default(autoincrement())
+  email           String            @unique
+  firebaseId      String            @unique
+  chats           ChatMessage[]
+  exercises       Exercise[]
+  UserTopic       UserTopic[]
+  ClassMembership ClassMembership[]
+}
+
+model Module {
+  id              Int     @id @default(autoincrement())
+  name            String
+  topics          Topic[]
+  classId         Int
+  associatedClass Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+}
+
+model Topic {
+  id         Int         @id @default(autoincrement())
+  name       String
+  objectives String
+  moduleId   Int
+  exercises  Exercise[]
+  module     Module      @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  UserTopic  UserTopic[]
+}
+
+model UserTopic {
+  user_id  Int
+  topic_id Int
+  level    UserLevel
+  user     User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  topic    Topic     @relation(fields: [topic_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, topic_id])
+}
+
+model Exercise {
+  id          Int          @id @default(autoincrement())
+  name        String
+  content     String
+  testData    String
+  level       UserLevel
+  topicId     Int
+  boilerplate String?
+  testCode    String?
+  topic       Topic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id])
+  userId      Int
+  submissions Submission[]
+}
+
+model Submission {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  exerciseId  Int
+  content     String
+  passing     Boolean
+  exercise    Exercise      @relation(fields: [exerciseId], references: [id])
+  ChatMessage ChatMessage[]
+}
+
+model ChatMessage {
+  id           Int        @id @default(autoincrement())
+  content      String
+  timestamp    DateTime   @default(now())
+  userId       Int?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissionId Int
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
+
+model CourseTemplate {
+  id      Int              @id @default(autoincrement())
+  name    String
+  modules ModuleTemplate[]
+}
+
+model ModuleTemplate {
+  id               Int             @id @default(autoincrement())
+  name             String
+  courseTemplateId Int
+  courseTemplate   CourseTemplate  @relation(fields: [courseTemplateId], references: [id], onDelete: Cascade)
+  topics           TopicTemplate[]
+}
+
+model TopicTemplate {
+  id               Int            @id @default(autoincrement())
+  name             String
+  objectives       String
+  moduleTemplateId Int
+  moduleTemplate   ModuleTemplate @relation(fields: [moduleTemplateId], references: [id], onDelete: Cascade)
+}
+
+model Class {
+  id               Int               @id @default(autoincrement())
+  name             String
+  memberships      ClassMembership[]
+  modules          Module[]
+  classInvitations ClassInvitation[]
+}
+
+model ClassInvitation {
+  id              Int    @id @default(autoincrement())
+  email           String
+  classId         Int
+  associatedClass Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+}
+
+model ClassMembership {
+  userId          Int
+  classId         Int
+  user            User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  associatedClass Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, classId])
+}
+
+enum UserLevel {
+  Developing
+  Proficient
+  Advanced
+}
