@@ -5,18 +5,36 @@ const prisma = new PrismaClient();
 
 router.post("/create", async (req, res) => {
   const { firebaseId, email } = req.body;
-  const user = await prisma.user.findUnique({ where: { firebaseId } });
+  
+  // Temporary to give new users access to a test class.
+  const demoClass = await prisma.class.findFirst({ where: { name: "Pursuit Alpha Test" } });
+  
+  let user = await prisma.user.findUnique({ where: { email } });
+  let membership;
+
   if(user) {
-    res.json(user);
+    membership = await prisma.classMembership.findUnique({ 
+      where: { userId_classId: { userId: user.id, classId: demoClass.id }} 
+    });
   }
   else {
-    const nextUser = await prisma.user.create({
+    user = await prisma.user.create({
       data: {
         email, firebaseId
       }
     });
-    res.json(nextUser);
   }
+
+  // TODO: Remove this once we have a real login system.
+  if(!membership) {
+    membership = await prisma.classMembership.create({
+      data: {
+        user: { connect: { id: user.id } },
+        associatedClass: { connect: { id: demoClass.id } }
+      }
+    });
+  }
+  res.json(user);
 })
 
 module.exports = router;
