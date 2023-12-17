@@ -1,26 +1,34 @@
+const fs = require("fs");
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function generateProblem(openai, topic, difficultyLevel="normal") {
+
+  // Read file from miniTest in helpers directory above
+  const framework = fs.readFileSync("./helpers/miniTest.js", "utf8");
+
   const completion = await openai.createChatCompletion({
-    model: "gpt-3.5-turbo",
+    model: "gpt-4",
     messages: [
-      { role: "system", content: `
-      You are a senior developer coming up with a practice exercise for a junior developer to help them learn, develop, and hone their skills. 
+      { role: "system", content: `  
+      Your job is to generate a practice problem for a junior developer to help them learn, develop, and hone their skills.
+  
+      When possible, include a story element around the practice problem and try to tie the problem back to solving problems in the real world.
+  
+      For reference, a custom test framework is provided. The code for that is as follows:
 
-      Only return the content for the JSON object. The keys for the JSON object should be name, description, testData, boilerPlate, and testCode. “Name” should be the name of the exercise, “description” should be the problem description, and “boilerPlate” should be boiler plate code that the junior developer will fill in (including an export statement that exports all functions that were generated as part of the boilerplate, like module.exports = ...).
+      ${framework}
 
-      The JSON object should contain a field called "testData", which should be an array of objects, each representing the test cases in "testCode". Each object should have a "description" field, which should describe the case being tested with the input. Each object should also have an "expected" field, which is the expected value from the test. Each object should also have an "input" field, which is the input to the function being tested. Have at least 5 test cases.
-
-      The JSON object should contain a field called "testCode", which check for correct responses given the cases in the "testData" field. "testCode" should also include an import statement to import the necessary functions from a file called "submission.js" in the directory above it. There should be a separate test case for each entry in the "testData" field. As an example, if "testData" has 5 entries, then "testCode" should have 5 test cases, each with its own "it" statement. The test cases should be written using the Jest testing framework.
-      
-      When possible, include a story element around the practice problem and try to tie the problem back to solving problems in the real world. Only provide the JSON content.
-
-      The practice problem to be generated should be for the topic of ${topic}. This problem should be fit for a ${difficultyLevel} student.
-      ` },
+      Returns a JSON object. The keys for the JSON object should be name, description, testData, boilerPlate, and testCode. 
+        - “Name” should be the name of the exercise
+        - “description” should be the problem description
+        - “boilerPlate” should be boiler plate code that the junior developer will fill in
+        - "testData", which should be an array of objects. Each object should have a "description" field, which should describe the case being tested with the input. Each object should also have an "expected" field, which is the expected value from the test. Each object should also have an "input" field, which is the input to the function being tested. Have at least 5 test cases.
+        - "testCode", which checks for correct responses given the cases in the "testData" field. The test cases MUST line up 1 to 1 with the data in testData. The test cases should be written using the framework provided. No requires should be necessary, we are running this code in a VM and providing the framework through a context. A results variable will be exposed through a VM context, so ensure the last line updates the "results" variable to the results of the tests.
+    ` },
       { role: "user", content: `
-        Generate a problem. Return only the JSON.
-      ` }
+        Please generate a practice problem based on the topic "${topic}" with a difficulty level of "${difficultyLevel}". Return only the JSON data.
+      ` },
     ]
   });
 
@@ -28,7 +36,10 @@ async function generateProblem(openai, topic, difficultyLevel="normal") {
 
   console.log(content);
 
-  return JSON.parse(content);
+  // Hacky, but can't get GPT4 to not use backticks, so JSON.parse always fails
+  const details = eval(`let val = ${content}; val;`);
+
+  return details;
 }
 
 module.exports = generateProblem;

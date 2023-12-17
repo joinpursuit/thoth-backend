@@ -4,11 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const generateMessage = require('../generative/message');
 const prisma = new PrismaClient();
 
-const fs = require('fs');
-const concat = require('concat-stream');
-
-const copyDirectory = require('../helpers/copyDirectory');
-const { fail } = require('assert');
+const vm = require('vm');
 
 // GET all exercises
 router.get('/', async (req, res) => {
@@ -29,7 +25,7 @@ router.get('/:id', async (req, res) => {
     include: {
       submissions: {
         where: {
-          id: currentUser.id
+          userId: currentUser.id
         }
       }
     }
@@ -196,126 +192,46 @@ router.post('/:exerciseId/submissions/:submissionId/messages', async (req, res) 
 
 // A route for a given submission in relation to the exercise meant to run tests for that submission
 router.post('/:exerciseId/submissions/:submissionId/run', async (req, res) => {
-  const { submissionId } = req.params;
+  const submissionId = req.params.submissionId;
+  const exerciseId = req.params.exerciseId;
 
+  // Get the submission from the database
   const submission = await prisma.submission.findUnique({
     where: { id: Number(submissionId) }
   });
-  const { content } = submission;
 
-  // Get the exercise that the submission is for, and get the testCode data from it
   const exercise = await prisma.exercise.findUnique({
-    where: { id: Number(req.params.exerciseId) }
+    where: { id: Number(exerciseId) }
   });
+
+  const { content } = submission;
   const { testCode } = exercise;
 
-  // Generate a UUID
-  const uuid = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const fullFile = `${content}\n${testCode}`;
 
-  // Create a new folder in the runs directory of the project with the UUID
-  const dir = `./runs/${uuid}`;
-  fs.mkdirSync(dir, { recursive: true });
+  const sandbox = {
+    TestFramework: require("../helpers/miniTest"),
+    testData: JSON.parse(exercise.testData),
+    results: null,
+  }
+  const context = new vm.createContext(sandbox);
+  
+  const script = new vm.Script(fullFile);
+  script.runInContext(context);
 
-  // Create a new file in the new folder with the content of the submission
-  fs.writeFileSync(`${dir}/submission.js`, content);
+  const allPassed = sandbox.results.passed.length === exercise.testData.length;
+  if(allPassed) {
+    await prisma.submission.update({
+      where: {
+        id: Number(submissionId)
+      },
+      data: {
+        passing: true
+      }
+    });
+  }
 
-  // Makes a copy of the dockerfile in ../dockerfiles/javascript/Dockerfile to the new folder
-  fs.copyFileSync('./dockerfiles/javascript/Dockerfile', `${dir}/Dockerfile`);
-
-  // Makes a copy of the package.json file in ../dockerfiles/javascript/package.json to the new folder
-  fs.copyFileSync('./dockerfiles/javascript/package.json', `${dir}/package.json`);
-
-  // Makes a copy of the node_modules directory in ../dockerfiles/javascript/node_modules to the new folder
-  // and should recursively copy all the contents of the node_modules directory
-  copyDirectory('./dockerfiles/javascript/node_modules', `${dir}/node_modules`);
-
-  // Create a __tests__ folder in the new folder, and write the testCode to a file in that folder
-  fs.mkdirSync(`${dir}/__tests__`);
-  fs.writeFileSync(`${dir}/__tests__/test.js`, testCode);
-
-  // using the dockerode package, build a new image using the contents of the new folder
-  const Docker = require('dockerode');
-  const docker = new Docker();
-
-  // build the image
-  docker.buildImage({
-    context: dir,
-    src: ['Dockerfile', 'submission.js', '__tests__', 'package.json', 'node_modules']
-  }, { t: uuid }, function (err, stream) {
-
-    if (err) {
-      console.log(0, err);
-
-      // respond with the error
-      return res.json({ error: err });
-    }
-
-    docker.modem.followProgress(stream, onFinished, onProgress);
-
-    function onFinished(err, output) {
-      console.log(err);
-        if (err) {
-            return res.json({ error: err });
-        }
-        // once the build is complete, run the image
-
-        docker.run(uuid, ['npm', 'test'], new concat(function (output) {
-          // The output parameter here will contain all the data that has been written to the stream
-          result = output.toString();
-        }), function (err, data, container) {
-            if (err) {
-                console.log(2, err);
-                return res.json({ error: err });
-            }
-
-            const lines = result.split('\n').map(line => line.trim());
-
-            // Regex to replace all the ansi escape codes
-            const ansiRegex = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
-
-            const succeedingTests = lines.filter(
-              line => line.includes('✓')
-            ).map(
-              l => l.replace(ansiRegex, '').trim().slice(2)
-            ).map(l => ({ description: l, passing: true }))
-
-            let failingResults = lines.filter(
-              line => line.includes('●') || line.includes("Received:")
-            ).map(
-              l => l.replace(ansiRegex, '').replace(/●/g, '').replace(/Received:/g, '').trim()
-            );
-
-            let failingTests = [];
-            for(let i = 0; i < failingResults.length; i += 2) {
-              failingTests.push({
-                description: failingResults[i],
-                passing: false,
-                received: failingResults[i+1]
-              })
-            }
-
-            // remove the container
-            container.remove(function (err, data) {
-                if (err) {
-                    return res.json({ error: err });
-                }
-                // remove the image
-                docker.getImage(uuid).remove(function (err, data) {
-                    if (err) {
-                        return res.json({ error: err });
-                    }
-                    // remove the folder
-                    fs.rmdirSync(dir, { recursive: true });
-                    res.json(succeedingTests.concat(failingTests));
-                });
-            });
-        });
-    }
-
-    function onProgress(event) {
-      console.log(event);
-    }
-  });
+  res.json(sandbox.results);
 });
 
 
