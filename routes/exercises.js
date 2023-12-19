@@ -24,9 +24,13 @@ router.get('/:id', async (req, res) => {
     where: { id: Number(id) },
     include: {
       submissions: {
+        orderBy: {
+          id: 'desc'
+        },
         where: {
           userId: currentUser.id
-        }
+        },
+        take: 1,
       }
     }
   });
@@ -219,7 +223,7 @@ router.post('/:exerciseId/submissions/:submissionId/run', async (req, res) => {
   const script = new vm.Script(fullFile);
   script.runInContext(context);
 
-  const allPassed = sandbox.results.passed.length === exercise.testData.length;
+  const allPassed = sandbox.results.failed.length === 0;
   if(allPassed) {
     await prisma.submission.update({
       where: {

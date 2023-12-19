@@ -93,6 +93,14 @@ router.get('/:classId/modules/:moduleId/topics/:topicId/exercises', async (req, 
         topicId: Number(topicId),
         // Add additional where clauses if exercises need to be filtered by classId and moduleId
       },
+      include: {
+        submissions: {
+          orderBy: {
+            id: 'desc'
+          },
+          take: 1,
+        },
+      }
     });
 
     // Send the exercises data as a response

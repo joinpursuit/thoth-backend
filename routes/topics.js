@@ -59,9 +59,24 @@ router.get('/:id/exercises', async (req, res) => {
   const { id } = req.params;
 
   try {
+
+    const user = await prisma.user.findUnique({ where: { firebaseId: req.user.uid } });
+
     const topic = await prisma.topic.findUnique({
       where: { id: Number(id) },
-      include: { exercises: true },
+      include: { 
+        exercises: {
+          where: { userId: user.id },
+          include: {
+            submissions: {
+              orderBy: {
+                id: 'desc', // Assuming 'createdAt' is a field in 'Submission'
+              },
+              take: 1,
+            },
+          },
+        }, 
+      },
     });
 
     console.log(topic);
