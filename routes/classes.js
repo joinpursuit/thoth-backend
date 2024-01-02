@@ -86,11 +86,20 @@ router.get('/:classId/modules/:moduleId/topics', async (req, res) => {
 router.get('/:classId/modules/:moduleId/topics/:topicId/exercises', async (req, res) => {
   const { classId, moduleId, topicId } = req.params;
 
+  const uid = req.user.uid; // The user ID associated with the currently signed-in user
+
+  // You can use this user ID to fetch or create a user in your application database.
+  // For the purpose of this example, let's assume that your user model is named "User"
+
+  const user = await prisma.user.findUnique({ where: { firebaseId: uid } });
+
+
   try {
     // Retrieve the exercises related to the given topic
     const exercises = await prisma.exercise.findMany({
       where: {
         topicId: Number(topicId),
+        userId: user.id,
         // Add additional where clauses if exercises need to be filtered by classId and moduleId
       },
       include: {
