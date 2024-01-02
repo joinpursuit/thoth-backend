@@ -8,7 +8,16 @@ const vm = require('vm');
 
 // GET all exercises
 router.get('/', async (req, res) => {
-  const exercises = await prisma.exercise.findMany();
+  const currentUser = await prisma.user.findUnique({
+    where: { firebaseId: req.user.uid }
+  });
+  
+  // Find all exercises where the userId on the exercise connects to the currentUser
+  const exercises = await prisma.exercise.findMany({
+    where: {
+      userId: currentUser.id
+    }
+  });
   res.json(exercises);
 });
 
