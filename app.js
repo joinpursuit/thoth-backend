@@ -14,6 +14,8 @@ const UserClassRouter = require("./routes/classes");
 
 const app = express();
 
+app.use(cors());
+
 const serviceAccount = require('./cert.json');
 
 admin.initializeApp({
@@ -22,7 +24,6 @@ admin.initializeApp({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
 
 const configuration = new Configuration({
   apiKey: process.env.OPENAPI_API_KEY
