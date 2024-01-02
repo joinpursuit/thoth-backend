@@ -64,10 +64,10 @@ model Submission {
   id          Int           @id @default(autoincrement())
   userId      Int
   exerciseId  Int
-  content     String
   passing     Boolean
   exercise    Exercise      @relation(fields: [exerciseId], references: [id])
   ChatMessage ChatMessage[]
+  files       File[]
 }
 
 model ChatMessage {
@@ -130,4 +130,13 @@ enum UserLevel {
   Developing
   Proficient
   Advanced
+}
+
+model File {
+  id        Int      @id @default(autoincrement())
+  fileName  String
+  content   String
+  isFolder  Boolean
+  submissionId Int
+  Submission Submission @relation(fields: [submissionId], references: [id])
 }
