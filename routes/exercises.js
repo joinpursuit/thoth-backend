@@ -31,6 +31,9 @@ router.get('/:id', async (req, res) => {
           userId: currentUser.id
         },
         take: 1,
+        include: {
+          files: true // Include all files for the submission
+        }
       }
     }
   });
@@ -90,8 +93,14 @@ router.post('/:exerciseId/submissions', async (req, res) => {
       data: {
         exerciseId: Number(exerciseId),
         userId: user.id,
-        content: exercise.boilerplate,
-        passing: false
+        passing: false,
+        files: {
+          create: {
+            fileName: 'index.js',
+            content: '',
+            isFolder: false,
+          },
+        },
       }
     });
 
@@ -201,17 +210,20 @@ router.post('/:exerciseId/submissions/:submissionId/run', async (req, res) => {
 
   // Get the submission from the database
   const submission = await prisma.submission.findUnique({
-    where: { id: Number(submissionId) }
+    where: { id: Number(submissionId) },
+    include: {
+      files: true
+    }
   });
 
   const exercise = await prisma.exercise.findUnique({
     where: { id: Number(exerciseId) }
   });
 
-  const { content } = submission;
+  const submissionContent = submission.files.map(f => `// ${f.fileName}\n\n${f.content}`).join("\n");
   const { testCode } = exercise;
 
-  const fullFile = `${content}\n${testCode}`;
+  const fullFile = `${submissionContent}\n${testCode}`;
 
   const sandbox = {
     TestFramework: require("../helpers/miniTest"),
@@ -236,6 +248,53 @@ router.post('/:exerciseId/submissions/:submissionId/run', async (req, res) => {
   }
 
   res.json(sandbox.results);
+});
+
+router.post('/:exerciseId/submissions/:submissionId/files', async (req, res) => {
+  const { submissionId } = req.params;
+  const { fileName, isFolder } = req.body;
+
+  const submission = await prisma.submission.findUnique({
+    where: { id: Number(submissionId) }
+  });
+
+  const file = await prisma.file.create({
+    data: {
+      fileName,
+      content: "",
+      isFolder,
+      Submission: {
+        connect: { id: submission.id }
+      }
+    },
+  });
+
+  res.json(file);
+})
+
+router.put('/:exerciseId/submissions/:submissionId/files/:fileId', async (req, res) => {
+  const { fileId } = req.params;
+  const { fileName, content, isFolder } = req.body;
+
+  const file = await prisma.file.update({
+    where: { id: Number(fileId) },
+    data: {
+      fileName,
+      content,
+    },
+  });
+
+  res.json(file);
+});
+
+router.delete('/:exerciseId/submissions/:submissionId/files/:fileId', async (req, res) => {
+  const { fileId } = req.params;
+
+  const file = await prisma.file.delete({
+    where: { id: Number(fileId) },
+  });
+
+  res.json(file);
 });
 
 
