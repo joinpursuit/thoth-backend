@@ -130,32 +130,14 @@ router.post('/:classId/modules/:moduleId/topics/:topicId/exercises', async (req,
       return res.status(404).json({ error: "Topic not found" })
     }
 
-    let userTopic = await prisma.userTopic.findFirst({ 
-      where: { user_id: user.id, topic_id: Number(req.params.topicId) } 
-    });
-
-    if(!userTopic) {
-      userTopic = await prisma.userTopic.create({
-        data: {
-          user: {
-            connect: { id: user.id }
-          },
-          topic: {
-            connect: { id: Number(req.params.topicId) }
-          },
-          level: UserLevel.Developing
-        }
-      })
-    }
-
-    const problem = await generateProblem(req.openai, topic.name, userTopic.level);
+    const problem = await generateProblem(req.openai, topic.name, UserLevel.Developing);
 
     const nextProblem = await prisma.exercise.create({
       data: {
         name: problem.name,
         content: problem.description,
         testData: JSON.stringify(problem.testData),
-        level: userTopic.level,
+        level: UserLevel.Developing,
         boilerplate: problem.boilerPlate,
         testCode: problem.testCode,
         topic: {
@@ -165,7 +147,31 @@ router.post('/:classId/modules/:moduleId/topics/:topicId/exercises', async (req,
         },
         user: { connect: { id: user.id } }
       }
-    })
+    });
+
+    // Create a submission for the current user to this exercise
+    await prisma.submission.create({
+      data: {
+        passing: false,
+        exercise: {
+          connect: {
+            id: nextProblem.id
+          }
+        },
+        user: {
+          connect: {
+            id: user.id
+          }
+        },
+        files: {
+          create: {
+            fileName: 'index.js',
+            content: '',
+            isFolder: false,
+          },
+        }
+      }
+    });
     // Return the user ID to the client
     return res.json(nextProblem);
   } catch (error) {
