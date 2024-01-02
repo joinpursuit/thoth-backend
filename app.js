@@ -20,9 +20,9 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
-app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors());
 
 const configuration = new Configuration({
   apiKey: process.env.OPENAPI_API_KEY
