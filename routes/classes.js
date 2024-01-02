@@ -153,16 +153,8 @@ router.post('/:classId/modules/:moduleId/topics/:topicId/exercises', async (req,
     await prisma.submission.create({
       data: {
         passing: false,
-        exercise: {
-          connect: {
-            id: nextProblem.id
-          }
-        },
-        user: {
-          connect: {
-            id: user.id
-          }
-        },
+        exerciseId: nextProblem.id,
+        userId: user.id,
         files: {
           create: {
             fileName: 'index.js',
