@@ -14,7 +14,7 @@ const UserClassRouter = require("./routes/classes");
 
 const app = express();
 
-app.use(cors());
+app.use(cors({ credentials: true, origin: true }));
 
 const serviceAccount = require('./cert.json');
 
