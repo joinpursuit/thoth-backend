@@ -39,6 +39,8 @@ model UserTopic {
   user_id  Int
   topic_id Int
   level    UserLevel
+  completedExercisesDeveloping Boolean
+  completedExercisesProficient Boolean
   user     User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
   topic    Topic     @relation(fields: [topic_id], references: [id], onDelete: Cascade)
 
