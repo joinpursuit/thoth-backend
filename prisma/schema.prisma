@@ -11,6 +11,7 @@ model User {
   id              Int               @id @default(autoincrement())
   email           String            @unique
   firebaseId      String            @unique
+  lastSeen        DateTime
   chats           ChatMessage[]
   exercises       Exercise[]
   UserTopic       UserTopic[]
@@ -39,11 +40,8 @@ model UserTopic {
   user_id  Int
   topic_id Int
   level    UserLevel
-  completedExercisesDeveloping Boolean
-  completedExercisesProficient Boolean
   user     User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
   topic    Topic     @relation(fields: [topic_id], references: [id], onDelete: Cascade)
-
   @@unique([user_id, topic_id])
 }
 

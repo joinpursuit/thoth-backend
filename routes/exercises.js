@@ -218,11 +218,9 @@ router.post('/:exerciseId/submissions/:submissionId/messages', async (req, res) 
 router.post('/:exerciseId/submissions/:submissionId/run', async (req, res) => {
 
   //I going to wrap the "try catch" to an general function for future debug and logging demand
-  req.general_wraper = async (req, res, fn, error_callback) => {
+  req.generalWrapper = async (req, res, fn, errorCallback) => {
     //if this coding style got Accepted, it should be put at middleware, put it here for coding exmaple 
     //
-    req.user.id = (await prisma.user.findUnique({ where: { firebaseId: req.user.uid } })).id;
-
     try {
       await fn();
       //access (log to file or db) and performance checker put in here(in future), 
@@ -231,15 +229,16 @@ router.post('/:exerciseId/submissions/:submissionId/run', async (req, res) => {
       //error log to file or db
       console.error(error);
       res.status(500).json({ error: error.message });
-      if (error_callback) error_callback();
+      if (errorCallback) errorCallback();
+    }
+    finally {
+
     }
   }
   //exmaple route controller 
-  req.general_wraper(req, res, async () => {
 
-    const submissionId = req.params.submissionId;
-    const exerciseId = req.params.exerciseId;
-
+  req.generalWrapper(req, res, async () => {
+    const { submissionId, exerciseId } = req.params;
     //validation 
     if (Number(submissionId) <= 0) throw new Error("invalid submissionId.");
     if (Number(exerciseId) <= 0) throw new Error("invalid exerciseId.");
@@ -274,10 +273,9 @@ router.post('/:exerciseId/submissions/:submissionId/run', async (req, res) => {
     if (exercise === null) throw new Error(`can't find exercise or exe with ${exerciseId}`);
 
     const submissionContent = submission.files.map(f => `// ${f.fileName}\n\n${f.content}`).join("\n");
+
     const { testCode } = exercise;
-
     const fullFile = `${submissionContent}\n${testCode}`;
-
     const sandbox = {
       TestFramework: require("../helpers/miniTest"),
       testData: JSON.parse(exercise.testData),
@@ -303,37 +301,32 @@ router.post('/:exerciseId/submissions/:submissionId/run', async (req, res) => {
           }
         });
         //hector add
-        const total_submission = await tx.submission.findMany({
+        const totalSubmission = await tx.submission.findMany({
           where: { userId: Number(req.user.id) },
           include: { exercise: { select: { level: true, topicId: true } } }
         });
 
-        const submission_passed = {};
-        for (let topic of total_submission) if (topic.passing === true) {
-          if (submission_passed[topic.exercise.topicId] === undefined) {
-            submission_passed[topic.exercise.topicId] = {};
+        const submissionPassed = {};
+        for (let topic of totalSubmission) if (topic.passing === true) {
+          if (submissionPassed[topic.exercise.topicId] === undefined) {
+            submissionPassed[topic.exercise.topicId] = {};
           }
-          submission_passed[topic.exercise.topicId][topic.exercise.level] = submission_passed[topic.exercise.topicId][topic.exercise.level]++ || 1;
+          submissionPassed[topic.exercise.topicId][topic.exercise.level] = submissionPassed[topic.exercise.topicId][topic.exercise.level]++ || 1;
         }
 
         // if someone has at least five "Developing" exercises completed, their entry on the UserTopic should become "Proficient", and then if they have five "Proficient" exercises complete, they should become "Advanced",
-        for (let topic in submission_passed) {
-          if (submission_passed[topic].Proficient >= 5) {
-            await set_user_topic(Number(topic), req.user.id, "Advanced");
-          } else if (submission_passed[topic].Developing >= 5) {
-            await set_user_topic(Number(topic), req.user.id, "Proficient");
+        for (let topic in submissionPassed) {
+          if (submissionPassed[topic].Proficient >= 5) {
+            await setUserTopic(Number(topic), req.user.id, "Advanced");
+          } else if (submissionPassed[topic].Developing >= 5) {
+            await setUserTopic(Number(topic), req.user.id, "Proficient");
           } else {
-            await set_user_topic(Number(topic), req.user.id, "Developing");
+            await setUserTopic(Number(topic), req.user.id, "Developing");
           }
         }
 
         //helper for upsert userTopic
-        async function set_user_topic(user_id, topic_id, level) {
-          let complete_level_obj = {};
-          switch (level) {
-            case "Advanced": complete_level_obj = { completedExercisesDeveloping: true, completedExercisesProficient: true };
-            case "Proficient": complete_level_obj = { completedExercisesDeveloping: true };
-          }
+        async function setUserTopic(user_id, topic_id, level) {
           await tx.UserTopic.upsert({
             where: {
               user_id_topic_id: {
@@ -342,7 +335,7 @@ router.post('/:exerciseId/submissions/:submissionId/run', async (req, res) => {
               }
             },
             update: { level },
-            create: { user_id, topic_id, level, ...complete_level_obj }
+            create: { user_id, topic_id, level }
           });
         }
       })
