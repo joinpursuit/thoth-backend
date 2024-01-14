@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 const { Configuration, OpenAIApi } = require("openai");
+const { getUserInfo } = require("./_cache_");
+
 
 const ModuleRouter = require("./routes/modules");
 const TopicRouter = require("./routes/topics");
@@ -37,15 +39,20 @@ app.use((req, res, next) => {
 
 app.use(async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if(!authHeader) {
+  if (!authHeader) {
     return next();
   }
   const token = authHeader.split('Bearer ')[1];
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
+
     req.user = decodedToken;
+    //user.id for following request
+    const { id } = await getUserInfo(decodedToken);
+    req.user.id = id;
+
     next();
-  } catch(e) {
+  } catch (e) {
     console.log(e);
     res.status(403).send('Unauthorized');
   }
