@@ -236,7 +236,6 @@ router.post('/:exerciseId/submissions/:submissionId/run', async (req, res) => {
     }
   }
   //exmaple route controller 
-
   req.generalWrapper(req, res, async () => {
     const { submissionId, exerciseId } = req.params;
     //validation 
