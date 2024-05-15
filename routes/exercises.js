@@ -244,6 +244,8 @@ router.post('/:exerciseId/submissions/:submissionId/run', async (req, res) => {
   const script = new vm.Script(fullFile);
   script.runInContext(context);
 
+  console.log(sandbox.results)
+
   const allPassed = sandbox.results.failed.length === 0;
   if(allPassed) {
     await prisma.submission.update({
